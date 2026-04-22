@@ -5,7 +5,7 @@
 using namespace geode::prelude;
 
 /* Sprite scale AFTER removing pulsing. */
-constexpr float kRodBallScaleMultiplier = 0.18f;
+constexpr float kRodBallScaleMultiplier = 0.80f;
 
 namespace {
     /* Gameplay-side pulse objects. */
@@ -19,7 +19,9 @@ namespace {
             (id >= 1332 && id <= 1333) ||   // bump_02, ring_02
             id == 1594 ||                   // ring_custom_01
             id == 1704 ||                   // dashRing_01
-            id == 1751;                     // dashRing_02
+            id == 1751 ||                   // dashRing_02
+            id == 3004 ||                   // spiderRing_001
+            id == 3027;                     // teleportRing_001
     }
 
     /* "Light square" deco families. */
