@@ -1,4 +1,4 @@
-# v1.0.1-hotfix.1
+# v1.0.2
 - forgot about spider orb lmao
 
 # 1.0.1
