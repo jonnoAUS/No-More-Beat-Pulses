@@ -4,7 +4,7 @@
 
 using namespace geode::prelude;
 
-/* Sprite scale AFTER removing pulsing. */
+/* Sprite scale AFTER removing pulse. */
 constexpr float kRodBallScaleMultiplier = 0.80f;
 
 namespace {
