@@ -14,3 +14,7 @@ This mod disables those beat pulses on selected objects so the game looks a bit 
 - Great for those who prefer a more static look
 
 Made for players who just want the level to "chill out a bit."
+
+# Did I forget any?
+
+Open an issue on the [github](https://github.com/jonnoAUS/No-More-Beat-Pulses/issues) repo
