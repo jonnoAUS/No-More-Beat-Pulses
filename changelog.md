@@ -1,3 +1,6 @@
+# v1.1.0
+- Refactored code to make it way cleaner (thanks to flurrybun!)
+
 # v1.0.2
 - forgot about spider orb lmao
 
