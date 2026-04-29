@@ -2,31 +2,30 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/GameObject.hpp>
+#include <Geode/modify/HardStreak.hpp>
 
 using namespace geode::prelude;
 
-namespace {
-    constexpr float kRodBallScale = 0.25f;
+constexpr float kRodBallScale = 0.25f;
 
-    bool isRodBall(GameObject* obj) {
-        auto* sprite = typeinfo_cast<CCSprite*>(obj);
-        auto* cache = CCSpriteFrameCache::sharedSpriteFrameCache();
-        if (!sprite || !cache) return false;
+bool isRodBall(GameObject* obj) {
+    auto* sprite = typeinfo_cast<CCSprite*>(obj);
+    auto* cache = CCSpriteFrameCache::sharedSpriteFrameCache();
+    if (!sprite || !cache) return false;
 
-        if (auto* frame = cache->spriteFrameByName("rod_ball_01_001.png"); frame && sprite->isFrameDisplayed(frame)) return true;
-        if (auto* frame = cache->spriteFrameByName("rod_ball_02_001.png"); frame && sprite->isFrameDisplayed(frame)) return true;
-        if (auto* frame = cache->spriteFrameByName("rod_ball_03_001.png"); frame && sprite->isFrameDisplayed(frame)) return true;
+    if (auto* frame = cache->spriteFrameByName("rod_ball_01_001.png"); frame && sprite->isFrameDisplayed(frame)) return true;
+    if (auto* frame = cache->spriteFrameByName("rod_ball_02_001.png"); frame && sprite->isFrameDisplayed(frame)) return true;
+    if (auto* frame = cache->spriteFrameByName("rod_ball_03_001.png"); frame && sprite->isFrameDisplayed(frame)) return true;
 
-        return false;
-    }
+    return false;
+}
 
-    void disablePulse(GameObject* obj) {
-        obj->m_usesAudioScale = false;
-        obj->m_hasNoAudioScale = true;
-        obj->m_customAudioScale = false;
-        obj->m_minAudioScale = 1.0f;
-        obj->m_maxAudioScale = 1.0f;
-    }
+void disablePulse(GameObject* obj) {
+    obj->m_usesAudioScale = false;
+    obj->m_hasNoAudioScale = true;
+    obj->m_customAudioScale = false;
+    obj->m_minAudioScale = 1.0f;
+    obj->m_maxAudioScale = 1.0f;
 }
 
 class $modify(GameObject) {
@@ -106,5 +105,47 @@ class $modify(GameObject) {
         }
 
         GameObject::setScaleY(scaleY);
+    }
+};
+
+/* Remove pulsing of the wave. */
+class $modify(HardStreak) {
+    struct Fields {
+        float m_basePulseSize = 0.0f;
+        bool m_hasBasePulseSize = false;
+    };
+
+    bool init() {
+        if (!HardStreak::init()) return false;
+
+        if (!m_fields->m_hasBasePulseSize) {
+            m_fields->m_basePulseSize = m_pulseSize > 0.0f ? m_pulseSize : m_waveSize;
+            m_fields->m_hasBasePulseSize = true;
+        }
+
+        return true;
+    }
+
+    void updateStroke(float dt) {
+        bool disableWavePulse =
+            Mod::get()->getSettingValue<bool>("enabled") &&
+            Mod::get()->getSettingValue<bool>("disable-wave-pulse");
+
+        if (disableWavePulse) {
+            if (!m_fields->m_hasBasePulseSize) {
+                m_fields->m_basePulseSize = m_pulseSize > 0.0f ? m_pulseSize : m_waveSize;
+                m_fields->m_hasBasePulseSize = true;
+            }
+
+            /* Pin before updates so frame is build from stable value. */
+            m_pulseSize = m_fields->m_basePulseSize;
+        }
+
+        HardStreak::updateStroke(dt);
+
+        if (disableWavePulse) {
+            /* Pin again after just incase game rewrites every frame. (idk) */
+            m_pulseSize = m_fields->m_basePulseSize;
+        }
     }
 };

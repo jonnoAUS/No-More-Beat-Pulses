@@ -8,7 +8,7 @@
   	},
   	"id": "realgares.no-more-beat-pulses",
   	"name": "No More Beat Pulses",
-  	"version": "v1.1.0",
+  	"version": "v1.1.1",
   	"developer": "RealGares",
   	"description": "Reduces distractions by removing pulsing obj.",
   	"settings": {
@@ -29,6 +29,15 @@
       		"description": "Disables automatic beat pulsing on deco families such as lightsquares, lighttriangles, and light blocks.",
       		"type": "bool",
       		"default": true
-    	}
-  	}
+    	},
+		"disable-wave-pulse": {
+			"name": "Disable Wave Pulse",
+			"description": "Removes the beat pulse from the wave trail.",
+			"type": "bool",
+			"default": true
+		}
+  	},
+	"links": {
+		"source": "https://github.com/jonnoAUS/No-More-Beat-Pulses"
+	}
 }
