@@ -1,3 +1,6 @@
+# v1.1.2
+- Fixed an issue with orbs not being able to pulse after disabling
+
 # v1.1.1
 - Added an option to disable the wave trail pulse (thanks krikketsboy for the suggestion!)
 - Removed anon namespace (idk why i did this shit)

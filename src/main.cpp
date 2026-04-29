@@ -31,35 +31,73 @@ void disablePulse(GameObject* obj) {
 class $modify(GameObject) {
     struct Fields {
         bool m_isRodBall = false;
+        /* Fix: get previous orb state. */
+        bool m_cachedPulseState = false;
+        bool m_oldUsesAudioScale = false;
+        bool m_oldHasNoAudioScale = false;
+        bool m_oldCustomAudioScale = false;
+        float m_oldMinAudioScale = 1.0f;
+        float m_oldMaxAudioScale = 1.0f;
     };
+
+    void cachePulseState() {
+        if (m_fields->m_cachedPulseState) return;
+
+        m_fields->m_oldUsesAudioScale = m_usesAudioScale;
+        m_fields->m_oldHasNoAudioScale = m_hasNoAudioScale;
+        m_fields->m_oldCustomAudioScale = m_customAudioScale;
+        m_fields->m_oldMinAudioScale = m_minAudioScale;
+        m_fields->m_oldMaxAudioScale = m_maxAudioScale;
+        m_fields->m_cachedPulseState = true;
+    }
+    void restorePulse() {
+        if (!m_fields->m_cachedPulseState) return;
+
+        m_usesAudioScale = m_fields->m_oldUsesAudioScale;
+        m_hasNoAudioScale = m_fields->m_oldHasNoAudioScale;
+        m_customAudioScale = m_fields->m_oldCustomAudioScale;
+        m_minAudioScale = m_fields->m_oldMinAudioScale;
+        m_maxAudioScale = m_fields->m_oldMaxAudioScale;
+    }
+
+    bool shouldDisablePulseNow() {
+        if (!Mod::get()->getSettingValue<bool>("enabled")) {
+            return false;
+        }
+
+        if (m_fields->m_isRodBall) {
+            return Mod::get()->getSettingValue<bool>("disable-decoration-pulses");
+        }
+
+        bool gameplay = m_classType == GameObjectClassType::Game;
+        return gameplay
+            ? Mod::get()->getSettingValue<bool>("disable-gameplay-pulses")
+            : Mod::get()->getSettingValue<bool>("disable-decoration-pulses");
+    }
+    void applyPulseState() {
+        if (shouldDisablePulseNow()) {
+            disablePulse(this);
+        } else {
+            restorePulse();
+        }
+    }
 
     $override
     void customSetup() {
         GameObject::customSetup();
 
-        if (!Mod::get()->getSettingValue<bool>("enabled")) return;
-
         m_fields->m_isRodBall = isRodBall(this);
-        bool gameplay = m_classType == GameObjectClassType::Game;
+        cachePulseState();
+        applyPulseState();
 
-        if (m_fields->m_isRodBall) {
-            if (!Mod::get()->getSettingValue<bool>("disable-decoration-pulses")) return;
-
-            disablePulse(this);
-
-            /* Removing the pulsing makes the rod "balls" appear too big. Scale them down. */
+        if (
+            m_fields->m_isRodBall &&
+            Mod::get()->getSettingValue<bool>("enabled") &&
+            Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
+        ) {
             GameObject::setScaleX(this->getScaleX() * kRodBallScale);
             GameObject::setScaleY(this->getScaleY() * kRodBallScale);
-            return;
         }
-
-        if (gameplay) {
-            if (!Mod::get()->getSettingValue<bool>("disable-gameplay-pulses")) return;
-        } else {
-            if (!Mod::get()->getSettingValue<bool>("disable-decoration-pulses")) return;
-        }
-
-        disablePulse(this);
     }
 
     /* Override scale after setup to preserve custom scale. */
@@ -70,11 +108,12 @@ class $modify(GameObject) {
             Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
         ) {
             GameObject::setScale(scale * kRodBallScale);
-            disablePulse(this);
+            applyPulseState();
             return;
         }
 
         GameObject::setScale(scale);
+        applyPulseState();
     }
 
     /* Override scale after setup to preserve custom scale. */
@@ -85,11 +124,12 @@ class $modify(GameObject) {
             Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
         ) {
             GameObject::setScaleX(scaleX * kRodBallScale);
-            disablePulse(this);
+            applyPulseState();
             return;
         }
 
         GameObject::setScaleX(scaleX);
+        applyPulseState();
     }
 
     /* Override scale after setup to preserve custom scale. */
@@ -100,11 +140,12 @@ class $modify(GameObject) {
             Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
         ) {
             GameObject::setScaleY(scaleY * kRodBallScale);
-            disablePulse(this);
+            applyPulseState();
             return;
         }
 
         GameObject::setScaleY(scaleY);
+        applyPulseState();
     }
 };
 
