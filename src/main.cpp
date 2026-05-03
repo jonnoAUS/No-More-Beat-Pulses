@@ -1,16 +1,38 @@
 /* Special thanks to flurrybun for the code refactor! */
 
 #include <Geode/Geode.hpp>
+#include <Geode/binding/RingObject.hpp>
+#include <Geode/modify/EffectGameObject.hpp>
 #include <Geode/modify/GameObject.hpp>
 #include <Geode/modify/HardStreak.hpp>
 
 using namespace geode::prelude;
 
-constexpr float kRodBallScale = 0.25f;
+static constexpr float kRodBallScale = 0.25f;
 
-bool isRodBall(GameObject* obj) {
+static bool settingEnabled() {
+    return Mod::get()->getSettingValue<bool>("enabled");
+}
+static bool settingDisableGameplayPulses() {
+    return Mod::get()->getSettingValue<bool>("disable-gameplay-pulses");
+}
+static bool settingDisableDecorationPulses() {
+    return Mod::get()->getSettingValue<bool>("disable-decoration-pulses");
+}
+static bool settingDisableOrbHitPulse() {
+    return Mod::get()->getSettingValue<bool>("disable-orb-hit-pulse");
+}
+static bool settingDisableWavePulse() {
+    return Mod::get()->getSettingValue<bool>("disable-wave-pulse");
+}
+static bool shouldBlockOrbHitPulse() {
+    return settingEnabled() && settingDisableOrbHitPulse();
+}
+
+static bool isRodBall(GameObject* obj) {
     auto* sprite = typeinfo_cast<CCSprite*>(obj);
     auto* cache = CCSpriteFrameCache::sharedSpriteFrameCache();
+
     if (!sprite || !cache) return false;
 
     if (auto* frame = cache->spriteFrameByName("rod_ball_01_001.png"); frame && sprite->isFrameDisplayed(frame)) return true;
@@ -20,7 +42,11 @@ bool isRodBall(GameObject* obj) {
     return false;
 }
 
-void disablePulse(GameObject* obj) {
+static bool isDecorationObject(GameObject* obj) {
+    return obj && (obj->m_isDecoration || obj->m_isDecoration2);
+}
+
+static void disablePulse(GameObject* obj) {
     obj->m_usesAudioScale = false;
     obj->m_hasNoAudioScale = true;
     obj->m_customAudioScale = false;
@@ -28,9 +54,11 @@ void disablePulse(GameObject* obj) {
     obj->m_maxAudioScale = 1.0f;
 }
 
-class $modify(GameObject) {
+class $modify(NoMoreBeatPulsesGameObject, GameObject) {
     struct Fields {
         bool m_isRodBall = false;
+        bool m_finishedSetup = false;
+
         /* Fix: get previous orb state. */
         bool m_cachedPulseState = false;
         bool m_oldUsesAudioScale = false;
@@ -38,6 +66,10 @@ class $modify(GameObject) {
         bool m_oldCustomAudioScale = false;
         float m_oldMinAudioScale = 1.0f;
         float m_oldMaxAudioScale = 1.0f;
+
+        bool m_hasBaseScale = false;
+        float m_baseScaleX = 1.0f;
+        float m_baseScaleY = 1.0f;
     };
 
     void cachePulseState() {
@@ -50,7 +82,8 @@ class $modify(GameObject) {
         m_fields->m_oldMaxAudioScale = m_maxAudioScale;
         m_fields->m_cachedPulseState = true;
     }
-    void restorePulse() {
+
+    void restorePulseState() {
         if (!m_fields->m_cachedPulseState) return;
 
         m_usesAudioScale = m_fields->m_oldUsesAudioScale;
@@ -60,26 +93,61 @@ class $modify(GameObject) {
         m_maxAudioScale = m_fields->m_oldMaxAudioScale;
     }
 
-    bool shouldDisablePulseNow() {
-        if (!Mod::get()->getSettingValue<bool>("enabled")) {
-            return false;
-        }
+    void cacheBaseScale() {
+        if (m_fields->m_hasBaseScale) return;
 
-        if (m_fields->m_isRodBall) {
-            return Mod::get()->getSettingValue<bool>("disable-decoration-pulses");
-        }
-
-        bool gameplay = m_classType == GameObjectClassType::Game;
-        return gameplay
-            ? Mod::get()->getSettingValue<bool>("disable-gameplay-pulses")
-            : Mod::get()->getSettingValue<bool>("disable-decoration-pulses");
+        m_fields->m_baseScaleX = getScaleX();
+        m_fields->m_baseScaleY = getScaleY();
+        m_fields->m_hasBaseScale = true;
     }
-    void applyPulseState() {
-        if (shouldDisablePulseNow()) {
-            disablePulse(this);
-        } else {
-            restorePulse();
+
+    void setBaseScale(float scaleX, float scaleY) {
+        m_fields->m_baseScaleX = scaleX;
+        m_fields->m_baseScaleY = scaleY;
+        m_fields->m_hasBaseScale = true;
+    }
+
+    bool shouldTouchIdlePulse() {
+        if (!settingEnabled()) return false;
+
+        /* Rod balls are classified as deco. */
+        if (m_fields->m_isRodBall) {
+            return settingDisableDecorationPulses();
         }
+
+        /* Game objects have priority. */
+        if (m_classType == GameObjectClassType::Game) {
+            return settingDisableGameplayPulses();
+        }
+
+        return settingDisableDecorationPulses();
+    }
+
+    bool shouldShrinkRodBall() {
+        return
+            m_fields->m_isRodBall &&
+            settingEnabled() &&
+            settingDisableDecorationPulses();
+    }
+
+    void applyPulseState() {
+        cachePulseState();
+
+        if (shouldTouchIdlePulse()) {
+            disablePulse(this);
+            return;
+        }
+
+        restorePulseState();
+    }
+
+    void applyRodBallScale() {
+        if (!shouldShrinkRodBall()) return;
+
+        cacheBaseScale();
+
+        GameObject::setScaleX(m_fields->m_baseScaleX * kRodBallScale);
+        GameObject::setScaleY(m_fields->m_baseScaleY * kRodBallScale);
     }
 
     $override
@@ -87,26 +155,27 @@ class $modify(GameObject) {
         GameObject::customSetup();
 
         m_fields->m_isRodBall = isRodBall(this);
-        cachePulseState();
-        applyPulseState();
 
-        if (
-            m_fields->m_isRodBall &&
-            Mod::get()->getSettingValue<bool>("enabled") &&
-            Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
-        ) {
-            GameObject::setScaleX(this->getScaleX() * kRodBallScale);
-            GameObject::setScaleY(this->getScaleY() * kRodBallScale);
-        }
+        cachePulseState();
+        cacheBaseScale();
+
+        applyPulseState();
+        applyRodBallScale();
+
+        m_fields->m_finishedSetup = true;
     }
 
     /* Override scale after setup to preserve custom scale. */
+    $override
     void setScale(float scale) {
-        if (
-            m_fields->m_isRodBall &&
-            Mod::get()->getSettingValue<bool>("enabled") &&
-            Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
-        ) {
+        if (!m_fields->m_finishedSetup) {
+            GameObject::setScale(scale);
+            return;
+        }
+
+        if (shouldShrinkRodBall()) {
+            setBaseScale(scale, scale);
+
             GameObject::setScale(scale * kRodBallScale);
             applyPulseState();
             return;
@@ -117,12 +186,17 @@ class $modify(GameObject) {
     }
 
     /* Override scale after setup to preserve custom scale. */
+    $override
     void setScaleX(float scaleX) {
-        if (
-            m_fields->m_isRodBall &&
-            Mod::get()->getSettingValue<bool>("enabled") &&
-            Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
-        ) {
+        if (!m_fields->m_finishedSetup) {
+            GameObject::setScaleX(scaleX);
+            return;
+        }
+
+        if (shouldShrinkRodBall()) {
+            m_fields->m_baseScaleX = scaleX;
+            m_fields->m_hasBaseScale = true;
+
             GameObject::setScaleX(scaleX * kRodBallScale);
             applyPulseState();
             return;
@@ -133,12 +207,17 @@ class $modify(GameObject) {
     }
 
     /* Override scale after setup to preserve custom scale. */
+    $override
     void setScaleY(float scaleY) {
-        if (
-            m_fields->m_isRodBall &&
-            Mod::get()->getSettingValue<bool>("enabled") &&
-            Mod::get()->getSettingValue<bool>("disable-decoration-pulses")
-        ) {
+        if (!m_fields->m_finishedSetup) {
+            GameObject::setScaleY(scaleY);
+            return;
+        }
+
+        if (shouldShrinkRodBall()) {
+            m_fields->m_baseScaleY = scaleY;
+            m_fields->m_hasBaseScale = true;
+
             GameObject::setScaleY(scaleY * kRodBallScale);
             applyPulseState();
             return;
@@ -149,44 +228,62 @@ class $modify(GameObject) {
     }
 };
 
+/* Remove extra orb pulse when player clicks it. */
+class $modify(NoMoreBeatPulsesEffectGameObject, EffectGameObject) {
+    $override
+    void playTriggerEffect() {
+        if (
+            shouldBlockOrbHitPulse() &&
+            typeinfo_cast<RingObject*>(this)
+        ) {
+            return;
+        }
+
+        EffectGameObject::playTriggerEffect();
+    }
+};
+
 /* Remove pulsing of the wave. */
-class $modify(HardStreak) {
+class $modify(NoMoreBeatPulsesHardStreak, HardStreak) {
     struct Fields {
         float m_basePulseSize = 0.0f;
         bool m_hasBasePulseSize = false;
     };
 
+    void cachePulseSize() {
+        if (m_fields->m_hasBasePulseSize) return;
+
+        m_fields->m_basePulseSize = m_pulseSize > 0.0f ? m_pulseSize : m_waveSize;
+        m_fields->m_hasBasePulseSize = true;
+    }
+
+    void pinPulseSize() {
+        if (!settingEnabled() || !settingDisableWavePulse()) return;
+
+        cachePulseSize();
+
+        m_pulseSize = m_fields->m_basePulseSize;
+    }
+
+    $override
     bool init() {
+        /* Remove wave pulse. */
         if (!HardStreak::init()) return false;
 
-        if (!m_fields->m_hasBasePulseSize) {
-            m_fields->m_basePulseSize = m_pulseSize > 0.0f ? m_pulseSize : m_waveSize;
-            m_fields->m_hasBasePulseSize = true;
-        }
+        cachePulseSize();
+        pinPulseSize();
 
         return true;
     }
 
+    $override
     void updateStroke(float dt) {
-        bool disableWavePulse =
-            Mod::get()->getSettingValue<bool>("enabled") &&
-            Mod::get()->getSettingValue<bool>("disable-wave-pulse");
-
-        if (disableWavePulse) {
-            if (!m_fields->m_hasBasePulseSize) {
-                m_fields->m_basePulseSize = m_pulseSize > 0.0f ? m_pulseSize : m_waveSize;
-                m_fields->m_hasBasePulseSize = true;
-            }
-
-            /* Pin before updates so frame is build from stable value. */
-            m_pulseSize = m_fields->m_basePulseSize;
-        }
+        /* Pin before updates so frame is build from stable value. */
+        pinPulseSize();
 
         HardStreak::updateStroke(dt);
 
-        if (disableWavePulse) {
-            /* Pin again after just incase game rewrites every frame. (idk) */
-            m_pulseSize = m_fields->m_basePulseSize;
-        }
+        /* Pin again after just incase game rewrites every frame. (idk) */
+        pinPulseSize();
     }
 };

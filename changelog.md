@@ -1,3 +1,9 @@
+# v1.1.3
+- Added an option to disable orb activation pulses (thanks 3MPOW!)
+- Fixed gameplay and decoration pulse toggles affecting the wrong object types (thanks square3ang!)
+- Improved pulse restoring when settings are disabled
+- Cleaned up the code a bit more
+
 # v1.1.2
 - Fixed an issue with orbs not being able to pulse after disabling
 

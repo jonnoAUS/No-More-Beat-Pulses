@@ -8,7 +8,7 @@
   	},
   	"id": "realgares.no-more-beat-pulses",
   	"name": "No More Beat Pulses",
-  	"version": "v1.1.2",
+  	"version": "v1.1.3",
   	"developer": "RealGares",
   	"description": "Reduces distractions by removing pulsing obj.",
   	"settings": {
@@ -35,6 +35,12 @@
 			"description": "Removes the beat pulse from the wave trail.",
 			"type": "bool",
 			"default": true
+		},
+		"disable-orb-hit-pulse": {
+			"name": "Disable Orb Hit Pulse",
+			"description": "Stops orbs from doing their extra visual pulse when activated by the player.",
+			"type": "bool",
+			"default": false
 		}
   	},
 	"links": {
