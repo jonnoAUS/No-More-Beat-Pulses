@@ -1,8 +1,6 @@
 /* Special thanks to flurrybun for the code refactor! */
 
 #include <Geode/Geode.hpp>
-#include <Geode/binding/RingObject.hpp>
-#include <Geode/modify/EffectGameObject.hpp>
 #include <Geode/modify/GameObject.hpp>
 #include <Geode/modify/HardStreak.hpp>
 
@@ -24,9 +22,6 @@ static bool settingDisableOrbHitPulse() {
 }
 static bool settingDisableWavePulse() {
     return Mod::get()->getSettingValue<bool>("disable-wave-pulse");
-}
-static bool shouldBlockOrbHitPulse() {
-    return settingEnabled() && settingDisableOrbHitPulse();
 }
 
 static bool isRodBall(GameObject* obj) {
@@ -225,21 +220,6 @@ class $modify(NoMoreBeatPulsesGameObject, GameObject) {
 
         GameObject::setScaleY(scaleY);
         applyPulseState();
-    }
-};
-
-/* Remove extra orb pulse when player clicks it. */
-class $modify(NoMoreBeatPulsesEffectGameObject, EffectGameObject) {
-    $override
-    void playTriggerEffect() {
-        if (
-            shouldBlockOrbHitPulse() &&
-            typeinfo_cast<RingObject*>(this)
-        ) {
-            return;
-        }
-
-        EffectGameObject::playTriggerEffect();
     }
 };
 

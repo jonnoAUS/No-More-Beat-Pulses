@@ -1,3 +1,7 @@
+# v1.1.4
+- Removed orb activation pulse setting because gd already exposes that (i didn't know this ngl)
+- Removed `EffectGameObject::playTriggerEffect` hook to avoid unnecessary runtime checks
+
 # v1.1.3
 - Added an option to disable orb activation pulses (thanks 3MPOW!)
 - Fixed gameplay and decoration pulse toggles affecting the wrong object types (thanks square3ang!)
